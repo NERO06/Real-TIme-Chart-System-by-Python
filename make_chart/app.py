@@ -38,6 +38,8 @@ cfg = configparser.ConfigParser()
 config_file = os.path.join(os.path.abspath("."), "config.ini")
 cfg.read(config_file)
 
+style_sheet = [os.path.join(os.path.abspath("."), 'style.css')]
+
 db_config = {
     "user": cfg["DBserverA"]["USER"],
     "host": cfg["DBserverA"]["HOST"],
@@ -46,29 +48,62 @@ db_config = {
 
 
 def to_datetime(ts):
-    # timzoneはあえて指定せず(システムに依存)
     dt_obj = datetime.datetime.fromtimestamp(ts)
     return dt_obj
 
 
-app = dash.Dash(__name__)
+def xaxis(d_period):
+    pattern = [{'type': 'date', 'showline': True, 'linecolor': 'dimgrey',
+                'tickfont': {'size': 12}, 'tickformat': '%Y-%m-%d %H:%M'},
+               {'type': 'date', 'showline': True, 'linecolor': 'dimgrey',
+                'tickfont': {'size': 12}, 'tickformat': '%H:%M'}]
+    if (d_period == "data1m") or (d_period == "data1w"):
+        return pattern[0]
+    else:
+        return pattern[1]
+
+
+def yaxis(d_period):
+    pattern = [{'showline': True, 'linecolor': 'dimgrey', "tickmode": "auto", "nticks": 6},
+               {'showline': True, 'linecolor': 'dimgrey', "tickmode": "auto", "nticks": 6, "tickformat": ""}]
+    if (d_period == "data1m") or (d_period == "data1w") or (d_period == "data1d"):
+        return pattern[0]
+    else:
+        return pattern[1]
+
+
+app = dash.Dash(__name__, external_stylesheets=style_sheet)
 
 app.layout = html.Div(children=[
+    html.P(id="bbs", children="Presents by Blow Up By Black Swan."),
+    html.H1("Real Time Chart System by Plotly Dash, Python"),
+    html.Div([html.Div([html.Div(id="current_price"),
+                        html.Div([html.Span("(latest time: "),
+                                  html.Span(id="dealtime")],
+                                 style={'height': '50%',
+                                        'textAlign': 'center'})],
+                       style={'float': 'left', 'width': '40%'}
+                       ),
+              html.Div([dcc.RadioItems(id="radioitem",
+                                       options=[
+                                           {"label": "1 month", "value": "data1m"},
+                                           {"label": "1 week", "value": "data1w"},
+                                           {"label": "1 day", "value": "data1d"},
+                                           {"label": "6 hours", "value": "data6h"},
+                                           {"label": "1 hour", "value": "data1h"}
+                                       ],
+                                       value="data1m",
+                                       labelStyle={"display": "inline-block"}),
+                        dcc.Graph(id="graph",
+                                  config={'displayModeBar': False}),
+                        ],
+                       style={'float': 'right', 'width': '80%'})
+              ],
+             style={'display': 'flex'}
+             ),
     html.Div(id="intermediate", style={"display": "none"}),
-    html.H1("Real Time Chart System by Python"),
-    dcc.RadioItems(id="radioitem",
-                   options=[
-                       {"label": "1 month", "value": "data1m"},
-                       {"label": "1 week", "value": "data1w"},
-                       {"label": "1 day", "value": "data1d"},
-                       {"label": "6 hours", "value": "data6h"},
-                       {"label": "1 hour", "value": "data1h"}
-                   ],
-                   value="data1m",
-                   labelStyle={"display": "inline-block"}),
-    dcc.Graph(id="graph"),
     dcc.Interval(id="interval",
-                 interval=10 * 1000,
+                 interval=1000 * 1000,
                  n_intervals=0),
 ])
 
@@ -84,7 +119,8 @@ def data_format(n):
     :param n: <int> n_intervalのこと。トリガーの役割以外利用せず
     :return data_dict: <dict> 各グラフ用のデータが入った辞書
     """
-    current_time = time.time()
+    current_time = 1545759000.000
+    # current_time = time.time()
     data1m = fetch_db(db_config, current_time, "data1m")
     data1w = fetch_db(db_config, current_time, "data1w")
     data1d = fetch_db(db_config, current_time, "data1d")
@@ -97,16 +133,16 @@ def data_format(n):
 @app.callback(Output("graph", "figure"),
               [Input("radioitem", "value"),
                Input("intermediate", "children")])
-def func(value, json_data_dict):
+def make_figure(value, json_data):
     """
     グラフ表示用のためのfigureオブジェクトを返す
     関数の動き:トリガー発動(RadioItemsのvalue変更orintermediateのデータ変更) -> radioitemsのvalueに合うデータ選択
               -> データを両軸用に整形 -> figureオブジェクトを整形し、返す
     :param value: <str> radioitemsの指摘事項
-    :param json_data_dict: <list> intermediateタグから取得
+    :param json_data: <list> intermediateタグから取得
     :return figure: <figure> グラフ表示のためのfigureオブジェクト
     """
-    data_dict = json.loads(json_data_dict)
+    data_dict = json.loads(json_data)
     for i in data_dict:
         if i == value:
             data = data_dict[i]
@@ -116,21 +152,38 @@ def func(value, json_data_dict):
     price = ["{:,}".format(i[1]) for i in data]
     trace = go.Scatter(x=timestamp,
                        y=price,
-                       mode="lines",  # グラフの表示の仕方
-                       marker={'line': {
-                           'color': 'darkblue',
-                           'width': 1}
-                       })
-    ex_layout = {'title': 'BitFlyer Chart',
-                 'font': {'family': 'Oswald'},
-                 #'width': 1300,
-                 #'height': 600,
-                 'yaxis': {"tickmode": "auto",
-                           "nticks": 6,
-                           "tickformat": ",.2r"}
+                       mode="lines",
+                       line={'color': 'lightcoral',
+                             'width': 2},
+                       hoverinfo="x+y")
+    ex_layout = {'dragmode': 'turntable',
+                 'hoverlabel': {'bgcolor': 'linen',
+                                'bordercolor': 'pink',
+                                'font': {'size': 12,
+                                         'color': 'dimgrey'}},
+                 'xaxis': xaxis(value),
+                 'yaxis': yaxis(value)
                  }
     figure = go.Figure(data=[trace], layout=ex_layout)
     return figure
+
+
+@app.callback(Output("current_price", "children"),
+              [Input("intermediate", "children")])
+def show_current_price(json_data):
+    data_dict = json.loads(json_data)
+    price = data_dict["data1h"][-1][1]
+    current_price = "  " + str(price) + " YEN  "
+    return current_price
+
+
+@app.callback(Output("dealtime", "children"),
+              [Input("intermediate", "children")])
+def show_current_price(json_data):
+    data_dict = json.loads(json_data)
+    dt = to_datetime(data_dict["data1h"][-1][0])
+    dealtime = dt.strftime('%H:%M:%S') + ")"
+    return dealtime
 
 
 if __name__ == "__main__":
