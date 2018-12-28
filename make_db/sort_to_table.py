@@ -17,9 +17,9 @@ cfg = configparser.ConfigParser()
 cfg.read(config_file)
 
 config = {
-    "user": cfg["DBserverA"]["USER"],
-    "host": cfg["DBserverA"]["HOST"],
-    "password": cfg["DBserverA"]["PASSWORD"]
+    "user": cfg["DBserverT"]["USER"],
+    "host": cfg["DBserverT"]["HOST"],
+    "password": cfg["DBserverT"]["PASSWORD"]
 }
 
 start_ts = float(cfg['SORT_CONFIG']['START_TIME'])
