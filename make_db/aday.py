@@ -15,9 +15,9 @@ cfg = configparser.ConfigParser()
 cfg.read(config_file)
 
 config = {
-    "user": cfg["DBserverA"]["USER"],
-    "host": cfg["DBserverA"]["HOST"],
-    "password": cfg["DBserverA"]["PASSWORD"]
+    "user": cfg["DBserverT"]["USER"],
+    "host": cfg["DBserverT"]["HOST"],
+    "password": cfg["DBserverT"]["PASSWORD"]
 }
 
 confirm_query = "SELECT timestamp FROM blowupbbs_crypto.bf_aday ORDER BY no DESC LIMIT 1;"
