@@ -19,7 +19,7 @@ import pytz
 import requests
 
 from db import get_db, make_db, insert_db
-from schema import db_schema
+# from schema import db_schema
 
 
 class BF_api:
@@ -32,9 +32,9 @@ class BF_api:
         self.after = cfg["API_CONFIG"]["AFTER"]
         self.before = cfg["API_CONFIG"]["BEFORE"]
         self.config = {
-            "user": cfg["DBserverA"]["USER"],
-            "host": cfg["DBserverA"]["HOST"],
-            "password": cfg["DBserverA"]["PASSWORD"]
+            "user": cfg["DBserverT"]["USER"],
+            "host": cfg["DBserverT"]["HOST"],
+            "password": cfg["DBserverT"]["PASSWORD"]
         }
         self.slack_url = cfg["SLACK_CONFIG"]["SLACK_URL"]
 
@@ -83,9 +83,13 @@ class BF_api:
                 # slackに連絡
                 concept = "api server error"
                 err = "status code error"
-                err_c = api_data_json.json()
+                try:
+                    err_c = api_data_json.json()
+                except Exception as err:
+                    er = "json error"
+                    err_c = err
                 place = params['after']
-                self.slack_error(concept, err, err_c, place)
+                self.slack_error(concept, er, err_c, place)
                 break
 
             api_data = api_data_json.json()
@@ -93,8 +97,8 @@ class BF_api:
                 current_time = time.time()
                 if (current_time - last_ts) <= (60 * 5):
                     break
-                params['before'] += 500
-                time.sleep(1)
+                params['before'] = int(params['before']) + 500
+                time.sleep(0.1)
                 continue
             api_data.sort(key=lambda x: x['id'])
             data_list = []
@@ -116,8 +120,8 @@ class BF_api:
                 self.slack_error(concept, err, err_c, place)
                 break
             params['after'] = last_id
-            params['before'] = last_id + 500
-            time.sleep(0.09)
+            params['before'] = last_id + 5000
+            time.sleep(0.1)
 
         # DBとのコネクション切断
         cur_obj.close()
@@ -172,6 +176,6 @@ class BF_api:
 
 if __name__ == '__main__':
     bf = BF_api()
-    make_db(db_schema, bf.config)
+    # make_db(db_schema, bf.config)
     last_id = bf.past_data()
     bf.real_data(last_id)
