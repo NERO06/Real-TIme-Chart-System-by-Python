@@ -51,8 +51,8 @@ def fetch_db(config, current_time, d_period):
     ts1m = 60 * 60 * 24 * 30 + 60 * 60 * 24
     ts1w = 60 * 60 * 24 * 7 + 60 * 60 * 6
     ts1d = 60 * 60 * 24 + 60 * 60
-    ts6h = 60 * 10
-    ts1h = 60 * 5
+    ts6h = 60 * 60 * 6 + 60 * 10
+    ts1h = 60 * 60 + 60 * 5
     tss = {"data1m": ts1m,
            "data1w": ts1w,
            "data1d": ts1d,
@@ -65,8 +65,8 @@ def fetch_db(config, current_time, d_period):
               "data1h": "bf_base"}
     ts = [tss[i] for i in tss if i == d_period]
     table = [tables[i] for i in tables if i == d_period]
-    query_base = "SELECT timestamp, price FROM blowupbbs_crypto.{} WHERE {} < timestamp and timestamp <= {};"
-    query = query_base.format(table[0], (current_time - ts[0]), current_time)
+    query_base = "SELECT timestamp, price FROM blowupbbs_crypto.{} WHERE {} < timestamp;"
+    query = query_base.format(table[0], (current_time - ts[0]))
     con_obj, cur_obj = get_db(config)
     cur_obj.execute(query)
     data = cur_obj.fetchall()
