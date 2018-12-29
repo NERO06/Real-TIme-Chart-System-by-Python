@@ -1,0 +1,8 @@
+make_chart/.idea/
+make_chart/__pycache__/
+make_chart/config.ini
+make_chart/venv/
+make_db/.idea/
+make_db/__pycache__/
+make_db/config.ini
+make_db/venv/
