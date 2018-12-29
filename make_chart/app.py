@@ -31,14 +31,13 @@ from dash.dependencies import Output
 import dash_core_components as dcc
 import dash_html_components as html
 import plotly.graph_objs as go
+import pytz
 
 from db import fetch_db
 
 cfg = configparser.ConfigParser()
 config_file = os.path.join(os.path.abspath("."), "config.ini")
 cfg.read(config_file)
-
-style_sheet = [os.path.join(os.path.abspath("."), 'style.css')]
 
 db_config = {
     "user": cfg["DBserverA"]["USER"],
@@ -48,15 +47,16 @@ db_config = {
 
 
 def to_datetime(ts):
-    dt_obj = datetime.datetime.fromtimestamp(ts)
+    tokyo = pytz.timezone('Asia/Tokyo')
+    dt_obj = datetime.datetime.fromtimestamp(ts, tokyo)
     return dt_obj
 
 
-def xaxis(d_period):
-    pattern = [{'type': 'date', 'showline': True, 'linecolor': 'dimgrey',
-                'tickfont': {'size': 12}, 'tickformat': '%Y-%m-%d %H:%M'},
-               {'type': 'date', 'showline': True, 'linecolor': 'dimgrey',
-                'tickfont': {'size': 12}, 'tickformat': '%H:%M'}]
+def xaxis(d_period, dt):
+    pattern = [{'type': 'date', 'range': dt, 'fixedrange': True, 'showline': True, 'linecolor': 'dimgrey',
+                'tickfont': {'size': 12}},
+               {'type': 'date', 'range': dt, 'fixedrange': True, 'showline': True, 'linecolor': 'dimgrey',
+                'tickfont': {'size': 12}}]
     if (d_period == "data1m") or (d_period == "data1w"):
         return pattern[0]
     else:
@@ -64,21 +64,23 @@ def xaxis(d_period):
 
 
 def yaxis(d_period):
-    pattern = [{'showline': True, 'linecolor': 'dimgrey', "tickmode": "auto", "nticks": 6},
-               {'showline': True, 'linecolor': 'dimgrey', "tickmode": "auto", "nticks": 6, "tickformat": ""}]
+    pattern = [{'fixedrange': True, 'showline': True, 'linecolor': 'dimgrey',
+                "tickmode": "auto", "nticks": 7},
+               {'fixedrange': True, 'showline': True, 'linecolor': 'dimgrey',
+                "tickmode": "auto", "nticks": 7, "tickformat": ",d"}]
     if (d_period == "data1m") or (d_period == "data1w") or (d_period == "data1d"):
         return pattern[0]
     else:
         return pattern[1]
 
 
-app = dash.Dash(__name__, external_stylesheets=style_sheet)
+app = dash.Dash(__name__)
 
 app.layout = html.Div(children=[
     html.P(id="bbs", children="Presents by Blow Up By Black Swan."),
     html.H1("Real Time Chart System by Plotly Dash, Python"),
     html.Div([html.Div([html.Div(id="current_price"),
-                        html.Div([html.Span("(latest time: "),
+                        html.Div([html.Span("latest price "),
                                   html.Span(id="dealtime")],
                                  style={'height': '50%',
                                         'textAlign': 'center'})],
@@ -103,7 +105,7 @@ app.layout = html.Div(children=[
              ),
     html.Div(id="intermediate", style={"display": "none"}),
     dcc.Interval(id="interval",
-                 interval=1000 * 1000,
+                 interval=10 * 1000,
                  n_intervals=0),
 ])
 
@@ -119,8 +121,8 @@ def data_format(n):
     :param n: <int> n_intervalのこと。トリガーの役割以外利用せず
     :return data_dict: <dict> 各グラフ用のデータが入った辞書
     """
-    current_time = 1545759000.000
-    # current_time = time.time()
+    # current_time = 1545759000.000
+    current_time = time.time()
     data1m = fetch_db(db_config, current_time, "data1m")
     data1w = fetch_db(db_config, current_time, "data1w")
     data1d = fetch_db(db_config, current_time, "data1d")
@@ -148,9 +150,10 @@ def make_figure(value, json_data):
             data = data_dict[i]
         continue
     # figureオブジェクトの生成
-    timestamp = [to_datetime(i[0]) for i in data]
-    price = ["{:,}".format(i[1]) for i in data]
-    trace = go.Scatter(x=timestamp,
+    dealtimes = [to_datetime(i[0]) for i in data]
+    dt = [dealtimes[0], dealtimes[-1]]
+    price = ["{:,}".format(int(i[1])) for i in data]
+    trace = go.Scatter(x=dealtimes,
                        y=price,
                        mode="lines",
                        line={'color': 'lightcoral',
@@ -161,7 +164,7 @@ def make_figure(value, json_data):
                                 'bordercolor': 'pink',
                                 'font': {'size': 12,
                                          'color': 'dimgrey'}},
-                 'xaxis': xaxis(value),
+                 'xaxis': xaxis(value, dt),
                  'yaxis': yaxis(value)
                  }
     figure = go.Figure(data=[trace], layout=ex_layout)
@@ -173,7 +176,7 @@ def make_figure(value, json_data):
 def show_current_price(json_data):
     data_dict = json.loads(json_data)
     price = data_dict["data1h"][-1][1]
-    current_price = "  " + str(price) + " YEN  "
+    current_price = "  " + "{:,}".format(int(price)) + " YEN  "
     return current_price
 
 
@@ -182,7 +185,7 @@ def show_current_price(json_data):
 def show_current_price(json_data):
     data_dict = json.loads(json_data)
     dt = to_datetime(data_dict["data1h"][-1][0])
-    dealtime = dt.strftime('%H:%M:%S') + ")"
+    dealtime = "(" + dt.strftime('%H:%M:%S') + ")"
     return dealtime
 
 
