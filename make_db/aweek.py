@@ -1,15 +1,19 @@
-#! シバン行
+"""
+ワンウィーク表記用のテーブルを作成するための実行ファイル
+過去データはsort_to_data.pyで仕分け、リアルタイムはこのaweek.pyで仕分け
+※ cronで5分ごとに実行する
+(1) 設定の読み込み
+(2) 現在時刻とbf_aweekテーブルの最終データ時刻を比較
+    5分以上 -> sort_to_table.pyが稼働中であり、このプログラムの実行機会でないため、実行終了
+    5分未満 -> bf_baseテーブルからデータを1つ取得し、bf_aweekテーブルに追加
+"""
 
-"""
-ワンウィーク表記用のテーブルを作成するための実行ファイル。
-cronで30分ごとに実行する
-DB接続設定: DBserverD
-"""
 import configparser
 import os
 import time
 from db import get_db
 
+# (1) 設定の読み込み
 config_file = os.path.join(os.path.abspath('.'), "config.ini")
 cfg = configparser.ConfigParser()
 cfg .read(config_file)
@@ -28,6 +32,7 @@ current_time = time.time()
 con_obj, cur_obj = get_db(config)
 cur_obj.execute(confirm_query)
 last_time = cur_obj.fetchone()[0]
+# (2) 現在時刻とbf_aweekテーブルの最終データ時刻を比較
 if (current_time - last_time) > (60*30):
     pass
 else:

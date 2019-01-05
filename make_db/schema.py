@@ -1,3 +1,14 @@
+"""
+スキーマの構造
+1. 同名データベースがあれば削除
+2. データベース作成(blowupbbs_crypto)
+3. ベースとなるテーブル作成(bf_base)
+   column: no, id, price, timestamp
+4. 各憑依期間に対応するテーブルを作成(bf_aday, bf_aweek, bf_amonth)
+   column: no, base_no(bf_baseのno), id, price, timestamp
+
+"""
+
 db_schema = [
     "DROP DATABASE IF EXISTS blowupbbs_crypto;",  # DB作成
     "CREATE DATABASE blowupbbs_crypto;",

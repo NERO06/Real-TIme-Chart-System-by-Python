@@ -1,15 +1,17 @@
 """
 DBの取り扱いに関する関数を格納
-get_db(): DBとの接続
-          params -> nothing
-          config -> from config.ini
-make_db(): DBと関連テーブルの作成(基本は初回の1回しか実行しない)
+get_db: DBとの接続
+fetch_db: DBからデータを取得
 """
 import mysql.connector
 
 
-# DBserverとの接続用メソッド
 def get_db(config):
+    """
+    DBserverとの接続用
+    :param config: 設定情報
+    :return: Connectionオブジェクト、 Cursorオブジェクト
+    """
     try:
         con_obj = mysql.connector.connect(**config)
     except Exception as err:
@@ -18,35 +20,16 @@ def get_db(config):
     return con_obj, cur_obj
 
 
-# DBの作成
-def make_db(queries, config):
-    con_obj, cur_obj = get_db(config)
-    for query in queries:
-        cur_obj.execute(query)
-    cur_obj.close()
-    con_obj.close()
-
-
-# データ保存用
-def insert_db(con_obj, cur_obj, data_list):
-    insert_query = (
-        "INSERT INTO blowupbbs_crypto.bf_base (id, price, timestamp) "
-        "VALUES (%s, %s, %s);"
-    )
-    cur_obj.executemany(insert_query, data_list)
-    con_obj.commit()
-
-
-# データ取得用
 def fetch_db(config, current_time, d_period):
     """
     DBからデータを取得し、返す関数
-    関数の動き: 基本情報取得(DB設定, 発動時点, 対象期間) -> SQL文の組成 -> SQL文の実行
-               -> データを納めた変数をリスト化 -> リストを返す
+    (1)基本情報取得(DB設定, 発動時点, 対象期間)
+    (2)SQL文の組成・実行
+    (3)データを納めた変数をリスト化し返す
     :param config: DBの設定
-    :param current_time: <int> 現在時刻を表示
+    :param current_time: <int> 現在時刻
     :param d_period: <str>グラフ表示期間。data period
-    :return:
+    :return: <list> データが入ったリスト
     """
     ts1m = 60 * 60 * 24 * 30 + 60 * 60 * 24
     ts1w = 60 * 60 * 24 * 7 + 60 * 60 * 6

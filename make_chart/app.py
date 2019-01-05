@@ -1,11 +1,14 @@
 """
 チャート表示用のプラグラム
-Interval => 定期発火し、グラフを表示する
-intermediate => data生成と保持
-radioitems => 表示期間の選択
-graph => グラフ表示
+PythonのWEBアプリケーションフレームワークDashを利用
 
-データ表示の2つの流れ:
+レイアウトの内容:
+    Interval => 定期発火し、グラフを表示する
+    intermediate => data生成と保持
+    radioitems => 表示期間の選択
+    graph => グラフ表示
+
+データ表示が変更される2つの流れ:
 1. intervalを利用した定期更新(初回起動時も含む)
     (1) intervalが発火(intervalごとに発火 -> n_intervalが一つ増加)
     (2) data_format関数発動
@@ -47,12 +50,23 @@ db_config = {
 
 
 def to_datetime(ts):
+    """
+    テーブルから取り出したタイムスタンプを時刻オブジェクトに帰る
+    :param ts: <str> タイムスタンプ
+    :return: Datetimeオブジェクト
+    """
     tokyo = pytz.timezone('Asia/Tokyo')
     dt_obj = datetime.datetime.fromtimestamp(ts, tokyo)
     return dt_obj
 
 
 def xaxis(d_period, dt):
+    """
+    x軸のレイアウトを返す
+    :param d_period: 表示するチャートの期間
+    :param dt: x軸の対象期間
+    :return: パターン1[1か月チャート、1週間チャート]、パターン2[1日チャート、6hチャート,1hチャート]
+    """
     pattern = [{'type': 'date', 'range': dt, 'fixedrange': True, 'showline': True, 'linecolor': 'dimgrey',
                 'tickfont': {'size': 12}},
                {'type': 'date', 'range': dt, 'fixedrange': True, 'showline': True, 'linecolor': 'dimgrey',
@@ -64,6 +78,11 @@ def xaxis(d_period, dt):
 
 
 def yaxis(d_period):
+    """
+    yy軸のレイアウトを返す
+    :param d_period: 表示するチャートの期間
+    :return: パターン1[1ヶ月チャート、1週間チャート、1日チャート]、パターン2[6hチャート、1hチャート]
+    """
     pattern = [{'fixedrange': True, 'showline': True, 'linecolor': 'dimgrey',
                 "tickmode": "auto", "nticks": 7},
                {'fixedrange': True, 'showline': True, 'linecolor': 'dimgrey',
@@ -114,15 +133,21 @@ app.layout = html.Div(children=[
               [Input("interval", "n_intervals")])
 def data_format(n):
     """
-    データの整形に用いられるメソッド。
-    dcc.Intervalが発火(アクセス時も含む)
-    関数の動き: トリガー発動(n_intervalの値変更) -> 現在時刻計算 -> DBからデータ取得
-               -> 各データを格納したリストをintermediateに返す
+    テーブルからデータを取得し、整形する
+    (1)dcc.Intervalが発火(アクセス時も含む)
+    (2)関数が作動:
+        1. 現在時刻計算
+        2. 対象テーブルから現在時刻から換算した対象期間のデータを全てのチャート表示期間用に取得
+        3. 各データを格納したリストをJson化し、intermediateに返す
+           ※ コールバック間でデータを渡すためにはJson化が必須
     :param n: <int> n_intervalのこと。トリガーの役割以外利用せず
-    :return data_dict: <dict> 各グラフ用のデータが入った辞書
+    :return data_dict: <dict> 各チャート用のデータが入ったdict
     """
-    # current_time = 1545759000.000
+
+    # 1. 現在時刻計算
     current_time = time.time()
+
+    # 2. 対象テーブルから現在時刻から換算した対象期間のデータを全てのチャート表示期間用に取得
     data1m = fetch_db(db_config, current_time, "data1m")
     data1w = fetch_db(db_config, current_time, "data1w")
     data1d = fetch_db(db_config, current_time, "data1d")
@@ -138,18 +163,24 @@ def data_format(n):
 def make_figure(value, json_data):
     """
     グラフ表示用のためのfigureオブジェクトを返す
-    関数の動き:トリガー発動(RadioItemsのvalue変更orintermediateのデータ変更) -> radioitemsのvalueに合うデータ選択
-              -> データを両軸用に整形 -> figureオブジェクトを整形し、返す
-    :param value: <str> radioitemsの指摘事項
-    :param json_data: <list> intermediateタグから取得
+    (1)トリガー発動: radiotimesのvalueが変更 or intermediateのchildrenが変更
+    (2)関数が作動:
+        1. intermediateのchildrenにあるデータをJsonからpythonのデータに変換
+        2. radioitemsのvalueに一致するデータ取り出し
+        3. グラフ用にデータを整形
+        4. figureオブジェクトを返す
+    :param value: <str> radioitemsのの値(チャートの表示期間を表す)
+    :param json_data: intermediateのchildrenにあるJsonデータ
     :return figure: <figure> グラフ表示のためのfigureオブジェクト
     """
+    # 1. intermediateのchildrenにあるデータをJsonからpythonのデータに変換
     data_dict = json.loads(json_data)
+    # 2. radioitemsのvalueに一致するデータ取り出し
     for i in data_dict:
         if i == value:
             data = data_dict[i]
         continue
-    # figureオブジェクトの生成
+    # 3. グラフ用にデータを整形
     dealtimes = [to_datetime(i[0]) for i in data]
     dt = [dealtimes[0], dealtimes[-1]]
     price = ["{:,}".format(int(i[1])) for i in data]
@@ -174,6 +205,11 @@ def make_figure(value, json_data):
 @app.callback(Output("current_price", "children"),
               [Input("intermediate", "children")])
 def show_current_price(json_data):
+    """
+    現在価格を表すために利用するメソッド
+    :param json_data: intermediateのchildrenに格納されているJsonでーた
+    :return: <str> 現在価格
+    """
     data_dict = json.loads(json_data)
     price = data_dict["data1h"][-1][1]
     current_price = "  " + "{:,}".format(int(price)) + " YEN  "
@@ -182,12 +218,18 @@ def show_current_price(json_data):
 
 @app.callback(Output("dealtime", "children"),
               [Input("intermediate", "children")])
-def show_current_price(json_data):
+def show_current_time(json_data):
+    """
+    現在時刻を表示するためのメソッド
+    :param json_data: intermediateのchildrenに格納されているJsonでーた
+    :return: <str> 現在時刻
+    """
     data_dict = json.loads(json_data)
     dt = to_datetime(data_dict["data1h"][-1][0])
     dealtime = "(" + dt.strftime('%H:%M:%S') + ")"
     return dealtime
 
 
+# 実行プログラム
 if __name__ == "__main__":
     app.run_server(debug=False)
